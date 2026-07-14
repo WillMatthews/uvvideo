@@ -41,6 +41,9 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <div class="control">
       <button id="toggle">Start camera</button>
     </div>
+    <div class="control">
+      <button id="compare">Compare vs JPEG/WebP</button>
+    </div>
   </div>
 
   <div class="canvases">
@@ -55,6 +58,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </div>
 
   <div class="stats" id="stats">press start</div>
+  <div class="stats" id="compare-stats" style="display: none"></div>
   <div id="error"></div>
 `;
 
@@ -79,7 +83,9 @@ const radiusCControl = document.querySelector<HTMLDivElement>("#radius-c-control
 const radiusCInput = document.querySelector<HTMLInputElement>("#radius-c")!;
 const radiusCVal = document.querySelector<HTMLSpanElement>("#radius-c-val")!;
 const toggleBtn = document.querySelector<HTMLButtonElement>("#toggle")!;
+const compareBtn = document.querySelector<HTMLButtonElement>("#compare")!;
 const statsEl = document.querySelector<HTMLDivElement>("#stats")!;
+const compareStatsEl = document.querySelector<HTMLDivElement>("#compare-stats")!;
 const errorEl = document.querySelector<HTMLDivElement>("#error")!;
 
 let size = Number(sizeSelect.value);
@@ -193,6 +199,7 @@ function stop() {
 }
 
 const fpsWindow: number[] = [];
+let lastPayloadBytes = 0;
 
 function loop() {
   if (!running) return;
@@ -236,6 +243,7 @@ function loop() {
   fpsWindow.push(now);
   while (fpsWindow.length && now - fpsWindow[0] > 1000) fpsWindow.shift();
 
+  lastPayloadBytes = kept;
   const raw = rawByteLength(size);
   statsEl.textContent = [
     `fps: ${fpsWindow.length}  mode: ${mode}`,
@@ -243,3 +251,54 @@ function loop() {
     `payload: ${kept} bytes/frame  vs raw ${raw} bytes/frame  (${(raw / kept).toFixed(1)}x smaller)`,
   ].join("\n");
 }
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+// Traditional-codec quality high enough that further increases barely
+// shrink the file — a stand-in for "as good as JPEG/WebP get here".
+const COMPARISON_QUALITY = 0.92;
+
+compareBtn.addEventListener("click", async () => {
+  if (!running || lastPayloadBytes === 0) {
+    errorEl.textContent = "Start the camera first so there's a live frame to compare.";
+    return;
+  }
+  compareBtn.disabled = true;
+  compareStatsEl.style.display = "";
+  compareStatsEl.textContent = "encoding comparison frames…";
+
+  const [jpegSharp, jpegBlurred, webpBlurred] = await Promise.all([
+    canvasToBlob(sourceCanvas, "image/jpeg", COMPARISON_QUALITY),
+    canvasToBlob(outputCanvas, "image/jpeg", COMPARISON_QUALITY),
+    canvasToBlob(outputCanvas, "image/webp", COMPARISON_QUALITY),
+  ]);
+
+  const ours = lastPayloadBytes;
+  const lines = [`UVideo payload: ${ours} bytes (this is what's actually being compared against)`, ""];
+
+  if (jpegSharp) {
+    lines.push(
+      `JPEG of SHARP source (q=${COMPARISON_QUALITY}): ${jpegSharp.size} bytes  ` +
+        `(${(jpegSharp.size / ours).toFixed(1)}x more than UVideo) — this is the "send full video, blur on receive" cost`,
+    );
+  }
+  if (jpegBlurred) {
+    lines.push(
+      `JPEG of the BLURRED reconstruction: ${jpegBlurred.size} bytes  ` +
+        `(${(jpegBlurred.size / ours).toFixed(1)}x more than UVideo) — "pre-blur then compress with a standard codec"`,
+    );
+  }
+  if (webpBlurred && webpBlurred.type === "image/webp") {
+    lines.push(
+      `WebP of the BLURRED reconstruction: ${webpBlurred.size} bytes  ` +
+        `(${(webpBlurred.size / ours).toFixed(1)}x more than UVideo)`,
+    );
+  } else if (webpBlurred) {
+    lines.push(`WebP not supported by this browser (canvas fell back to ${webpBlurred.type})`);
+  }
+
+  compareStatsEl.textContent = lines.join("\n");
+  compareBtn.disabled = false;
+});

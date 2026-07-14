@@ -1,5 +1,6 @@
 import { channelToSpectrum, spectrumToChannel, type ChannelSpectrum } from "./spectrum";
 import { imageDataToYCbCr, yCbCrToImageData } from "./colorspace";
+import { entropyEncode, entropyDecode } from "./rangecoder";
 
 // Three ideas stacked on top of the raw FFT crop:
 //
@@ -145,10 +146,11 @@ export function compressChannel(spectrum: ChannelSpectrum): Uint8Array {
     o += 1;
   }
 
-  return new Uint8Array(buf);
+  return entropyEncode(new Uint8Array(buf));
 }
 
-export function decompressChannel(bytes: Uint8Array): ChannelSpectrum {
+export function decompressChannel(compressed: Uint8Array): ChannelSpectrum {
+  const bytes = entropyDecode(compressed);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let o = 0;
   const radius = view.getUint8(o);
