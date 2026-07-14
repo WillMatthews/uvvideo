@@ -5,7 +5,7 @@ import { compressFrame, decompressFrame, compressedByteLength } from "./compress
 const SIZES = [64, 128, 256] as const;
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <h1>UVideo</h1>
+  <h1>UVVideo</h1>
   <p class="subtitle">
     Send frequency-domain coefficients instead of pixels. Only the low-frequency
     corner of the 2D FFT is ever computed and "transmitted" — the reconstruction
@@ -276,24 +276,24 @@ compareBtn.addEventListener("click", async () => {
   ]);
 
   const ours = lastPayloadBytes;
-  const lines = [`UVideo payload: ${ours} bytes (this is what's actually being compared against)`, ""];
+  const lines = [`UVVideo payload: ${ours} bytes (this is what's actually being compared against)`, ""];
 
   if (jpegSharp) {
     lines.push(
       `JPEG of SHARP source (q=${COMPARISON_QUALITY}): ${jpegSharp.size} bytes  ` +
-        `(${(jpegSharp.size / ours).toFixed(1)}x more than UVideo) — this is the "send full video, blur on receive" cost`,
+        `(${(jpegSharp.size / ours).toFixed(1)}x more than UVVideo) — this is the "send full video, blur on receive" cost`,
     );
   }
   if (jpegBlurred) {
     lines.push(
       `JPEG of the BLURRED reconstruction: ${jpegBlurred.size} bytes  ` +
-        `(${(jpegBlurred.size / ours).toFixed(1)}x more than UVideo) — "pre-blur then compress with a standard codec"`,
+        `(${(jpegBlurred.size / ours).toFixed(1)}x more than UVVideo) — "pre-blur then compress with a standard codec"`,
     );
   }
   if (webpBlurred && webpBlurred.type === "image/webp") {
     lines.push(
       `WebP of the BLURRED reconstruction: ${webpBlurred.size} bytes  ` +
-        `(${(webpBlurred.size / ours).toFixed(1)}x more than UVideo)`,
+        `(${(webpBlurred.size / ours).toFixed(1)}x more than UVVideo)`,
     );
   } else if (webpBlurred) {
     lines.push(`WebP not supported by this browser (canvas fell back to ${webpBlurred.type})`);
